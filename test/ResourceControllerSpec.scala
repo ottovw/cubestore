@@ -1,6 +1,5 @@
 import controllers.AlbumController
-import model.AlbumId
-import org.cubestore.Entity
+import model.{Album, AlbumId}
 import org.junit.runner._
 import org.specs2.mutable._
 import org.specs2.runner._
@@ -24,6 +23,7 @@ class ResourceControllerSpec extends Specification {
     "create an entity" in new WithApplication {
       val newAlbum = route(FakeRequest(POST, "/api/v1/albums").withJsonBody(Json.obj(
         "id" -> Json.obj("id" -> 1),
+        "artistId" -> Json.obj("id" -> 1),
         "title" -> "The Doors",
         "year" -> 2016
       ))).get
@@ -31,7 +31,8 @@ class ResourceControllerSpec extends Specification {
       println(contentAsString(newAlbum))
 
       status(newAlbum) must equalTo(OK)
-      val fromDb = Await.result(AlbumController.repo.findById(AlbumId(1)), Duration.Inf)
+      val fromDb: Option[Album] = Await.result(AlbumController.repo.findById(AlbumId(1)), Duration.Inf)
+      println(">>" + fromDb)
       fromDb must beSome.which(_.title == "The Doors")
     }
 

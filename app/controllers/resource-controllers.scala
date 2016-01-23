@@ -1,7 +1,7 @@
 package controllers
 
-import model.{Album, AlbumId}
-import org.cubestore.{InMemoryRepository, Repository, Id, Entity}
+import model.{AlbumId, Album}
+import org.cubestore.{EntityDescription, InMemoryRepository, Repository, Id}
 import play.api.libs.json._
 import play.api.mvc.{BodyParsers, Action, Controller}
 
@@ -20,10 +20,13 @@ class AlbumController extends Controller with ResourceController[AlbumId, Album]
 
   }
 
+  // TODO: remove
+  override def desc: EntityDescription[AlbumId, Album] = Album.albumDescription
 }
 
 object AlbumController {
-  def repo = new InMemoryRepository[AlbumId, Album]()
+  import model.Album._
+  val repo = new InMemoryRepository[AlbumId, Album]()
 }
 
 
@@ -35,7 +38,9 @@ object SongController extends Controller {
 
 }
 
-trait ResourceController[ID <: Id, ENTITY <: Entity[ID]] extends Controller {
+trait ResourceController[ID <: Id, ENTITY] extends Controller {
+
+  def desc: EntityDescription[ID, ENTITY]
 
   def repository: Repository[ID, ENTITY]
 
@@ -49,11 +54,12 @@ trait ResourceController[ID <: Id, ENTITY <: Entity[ID]] extends Controller {
   }
 
   def create = Action.async(BodyParsers.parse.json) {
-    request =>
+    request => {
       jsonCodec.read(request.body) match {
-        case JsSuccess(entity, _) => repository.insert(entity).map { _ => Ok("Oki!") }
+        case JsSuccess(entity, _) => repository.insert(entity)(desc).map { _ => Ok("Oki!") }
         case err: JsError => Future.successful(BadRequest(Json.obj("message" -> "Fail Dikkka") ++ JsError.toFlatJson(err)))
       }
+    }
   }
 
   /*def get(id: String) = Action.async {
@@ -76,7 +82,7 @@ trait ResourceController[ID <: Id, ENTITY <: Entity[ID]] extends Controller {
 }
 
 
-trait JsonCodec[ID <: Id, ENTITY <: Entity[ID]] {
+trait JsonCodec[ID <: Id, ENTITY] {
 
   def read(input: JsValue): JsResult[ENTITY]
 
@@ -85,13 +91,13 @@ trait JsonCodec[ID <: Id, ENTITY <: Entity[ID]] {
 }
 
 
-trait ReadCodec[INPUT, ID <: Id, ENTITY <: Entity[Id]] {
+trait ReadCodec[INPUT, ID <: Id, ENTITY] {
 
   def read(input: INPUT): ENTITY
 
 }
 
-trait WriteCodec[OUTPUT, ID <: Id, ENTITY <: Entity[Id]] {
+trait WriteCodec[OUTPUT, ID <: Id, ENTITY] {
 
   def write(entity: ENTITY): OUTPUT
 

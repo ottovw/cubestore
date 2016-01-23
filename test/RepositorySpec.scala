@@ -11,10 +11,6 @@ class RepositorySpec extends Specification {
 
     val repo = new InMemoryRepository[AlbumId, Album]()
 
-    implicit object AlbumDescription extends EntityDescription[AlbumId, Album] {
-      override def id(album: Album): AlbumId = album.id
-    }
-
     "allow to insert a single entity" in {
       val albumId = AlbumId(0)
       val artistId = ArtistId(0)
