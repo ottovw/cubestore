@@ -1,12 +1,31 @@
 package controllers
 
-import org.cubestore.{Repository, Id, Entity}
-import play.api.libs.json.{JsObject, Json}
-import play.api.mvc.{Action, Controller}
+import model.{Album, AlbumId}
+import org.cubestore.{InMemoryRepository, Repository, Id, Entity}
+import play.api.libs.json._
+import play.api.mvc.{BodyParsers, Action, Controller}
 
-object AlbumController extends Controller with ResourceController {
+import scala.concurrent.Future
+import scala.concurrent.ExecutionContext.Implicits.global
+
+class AlbumController extends Controller with ResourceController[AlbumId, Album] {
+
+  def repository = AlbumController.repo
+
+  def jsonCodec = new JsonCodec[AlbumId, Album] {
+
+    override def read(input: JsValue) = Json.fromJson(input)(Json.reads[Album])
+
+    override def write(entity: Album) = Json.toJson(entity)(Json.writes[Album])
+
+  }
 
 }
+
+object AlbumController {
+  def repo = new InMemoryRepository[AlbumId, Album]()
+}
+
 
 object ArtistController extends Controller {
 
@@ -25,15 +44,23 @@ trait ResourceController[ID <: Id, ENTITY <: Entity[ID]] extends Controller {
   def list = Action.async {
     repository.findAllById(Seq()).map {
       entities =>
-        Ok(Json.toJson(Json.obj("codechere" -> entities.toString)))
+        Ok(Json.toJson(entities.map(jsonCodec.write)))
     }
   }
 
-  def get(id: String) = Action.async {
+  def create = Action.async(BodyParsers.parse.json) {
+    request =>
+      jsonCodec.read(request.body) match {
+        case JsSuccess(entity, _) => repository.insert(entity).map { _ => Ok("Oki!") }
+        case err: JsError => Future.successful(BadRequest(Json.obj("message" -> "Fail Dikkka") ++ JsError.toFlatJson(err)))
+      }
+  }
+
+  /*def get(id: String) = Action.async {
     val id: ID = new ID {} // TODO ID binding
     repository.findById(id).map {
       _ match {
-        case Some(entity) => Ok(Json.toJson(Json.obj("codehere" -> entity.toString)))
+        case Some(entity) => Ok(jsonCodec.write(entity))
         case None => NotFound("Not Found")
       }
     }
@@ -45,15 +72,15 @@ trait ResourceController[ID <: Id, ENTITY <: Entity[ID]] extends Controller {
     repository.update(entity).map { _ =>
       Ok("Updated Dikkka!")
     }
-  }
+  }*/
 }
 
 
-trait JsonCodec[ID <: Id, ENTITY <: Entity[Id]] {
+trait JsonCodec[ID <: Id, ENTITY <: Entity[ID]] {
 
-  def read(input: JsObject): ENTITY
+  def read(input: JsValue): JsResult[ENTITY]
 
-  def write(entity: ENTITY): JsObject
+  def write(entity: ENTITY): JsValue
 
 }
 
